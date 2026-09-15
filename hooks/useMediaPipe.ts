@@ -14,42 +14,6 @@ import {
   GazeDirectionType,
   LandmarkPoint,
 } from '../lib/gazeDetection';
-import { useTabFocusAndGaze } from './useTabFocusAndGaze';
-
-// Intercept Emscripten stderr redirection of benign TFLite informational messages
-if (typeof window !== 'undefined' && !(window as any).__tflite_console_filtered) {
-  (window as any).__tflite_console_filtered = true;
-  const originalConsoleError = console.error;
-  const originalConsoleWarn = console.warn;
-  console.error = (...args: any[]) => {
-    const first = typeof args[0] === 'string' ? args[0] : '';
-    if (
-      first.startsWith('INFO:') ||
-      first.includes('TensorFlow Lite') ||
-      first.includes('XNNPACK')
-    ) {
-      if (console.info) {
-        console.info(...args);
-      }
-      return;
-    }
-    originalConsoleError.apply(console, args);
-  };
-  console.warn = (...args: any[]) => {
-    const first = typeof args[0] === 'string' ? args[0] : '';
-    if (
-      first.startsWith('INFO:') ||
-      first.includes('TensorFlow Lite') ||
-      first.includes('XNNPACK')
-    ) {
-      if (console.info) {
-        console.info(...args);
-      }
-      return;
-    }
-    originalConsoleWarn.apply(console, args);
-  };
-}
 
 export type GazeDirection = GazeDirectionType | 'AWAY' | 'LOOKING_LEFT' | 'LOOKING_RIGHT' | 'LOOKING_DOWN';
 export type PostureStatus = 'OPTIMAL' | 'COMPROMISED' | 'CRITICAL';
@@ -65,10 +29,9 @@ export interface AuditEvent {
   durationSec: number;
   structuredJson?: {
     isCheating: boolean;
-    direction: GazeDirectionType | string;
+    direction: GazeDirectionType;
     confidence: number;
     metrics?: Record<string, any>;
-    [key: string]: any;
   };
 }
 
@@ -182,7 +145,6 @@ export function useMediaPipe() {
   const animFrameIdRef = useRef<number | null>(null);
   const fpsFrameCountRef = useRef<number>(0);
   const fpsTimerRef = useRef<number>(0);
-  const isProcessingFrameRef = useRef<boolean>(false);
 
   // Latest detected landmarks for instant baseline capture
   const latestPoseLandmarksRef = useRef<PoseLandmark[] | null>(null);
@@ -288,10 +250,9 @@ export function useMediaPipe() {
       durationSec: number,
       structuredJson?: {
         isCheating: boolean;
-        direction: GazeDirectionType | string;
+        direction: GazeDirectionType;
         confidence: number;
         metrics?: Record<string, any>;
-        [key: string]: any;
       }
     ) => {
       const now = new Date();
@@ -399,27 +360,19 @@ export function useMediaPipe() {
 
   // Frame Processing Loop
   const processFrame = useCallback(() => {
-    if (isProcessingFrameRef.current) return;
-    isProcessingFrameRef.current = true;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) {
+      animFrameIdRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
 
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2) {
-        if (typeof document !== 'undefined' && !document.hidden) {
-          animFrameIdRef.current = requestAnimationFrame(processFrame);
-        }
-        return;
-      }
-
-      const now = performance.now();
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        if (typeof document !== 'undefined' && !document.hidden) {
-          animFrameIdRef.current = requestAnimationFrame(processFrame);
-        }
-        return;
-      }
+    const now = performance.now();
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      animFrameIdRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
 
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth || 640;
@@ -845,15 +798,8 @@ export function useMediaPipe() {
       }
     }
 
-      ctx.restore();
-      if (typeof document !== 'undefined' && document.hidden) {
-        // Tab is hidden; frame loop is driven by off-screen Web Worker ticks
-        return;
-      }
-      animFrameIdRef.current = requestAnimationFrame(processFrame);
-    } finally {
-      isProcessingFrameRef.current = false;
-    }
+    ctx.restore();
+    animFrameIdRef.current = requestAnimationFrame(processFrame);
   }, [showSkeleton, showFaceMesh, showHudOverlays, logAuditEvent, playSynthesizedChime]);
 
   // Start Webcam
@@ -976,39 +922,6 @@ export function useMediaPipe() {
     setAuditLog([]);
   }, []);
 
-  // ── Integrate Tab Focus & Continuous Background Gaze Sentry ─────────────
-  const tabFocus = useTabFocusAndGaze({
-    isCameraActive: cameraActive,
-    onBackgroundTick: () => {
-      processFrame();
-    },
-    onCalibrate: () => {
-      calibrate();
-    },
-    logAuditEvent: (code, severity, title, details, durationSec, structuredJson) => {
-      logAuditEvent(code, severity, title, details, durationSec || 0, structuredJson);
-    },
-  });
-
-  // Re-engage requestAnimationFrame when candidate returns to visible & active tab
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    const handleVisibilityResume = () => {
-      if (!document.hidden && cameraActive) {
-        if (animFrameIdRef.current) {
-          cancelAnimationFrame(animFrameIdRef.current);
-        }
-        animFrameIdRef.current = requestAnimationFrame(processFrame);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityResume);
-    window.addEventListener('focus', handleVisibilityResume);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityResume);
-      window.removeEventListener('focus', handleVisibilityResume);
-    };
-  }, [cameraActive, processFrame]);
-
   useEffect(() => {
     return () => {
       stopCamera();
@@ -1040,7 +953,5 @@ export function useMediaPipe() {
     dismissProctorAlert,
     clearAuditLog,
     logAuditEvent,
-    tabFocus,
-    processFrame,
   };
 }

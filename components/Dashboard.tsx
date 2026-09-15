@@ -23,9 +23,6 @@ import {
   Info,
   Layers,
   Code,
-  Lock,
-  ExternalLink,
-  MonitorOff,
 } from 'lucide-react';
 import { useMediaPipe, GazeDirection, SeverityLevel } from '../hooks/useMediaPipe';
 
@@ -55,7 +52,6 @@ export default function Dashboard() {
     dismissProctorAlert,
     clearAuditLog,
     logAuditEvent,
-    tabFocus,
   } = useMediaPipe();
 
   // Audio voice alert state
@@ -66,7 +62,7 @@ export default function Dashboard() {
 
   // Gemini AI Voice Alert handler
   const triggerVoiceAlert = useCallback(
-    async (type: 'POSTURE_COLLAPSE' | 'PROCTOR_VIOLATION' | 'TAB_SWITCH') => {
+    async (type: 'POSTURE_COLLAPSE' | 'PROCTOR_VIOLATION') => {
       if (audioMuted) return;
 
       try {
@@ -83,7 +79,6 @@ export default function Dashboard() {
               gazeDirection: gazeMetrics.direction,
               cheatingRisk: antiCheating.cheatingRiskIndex,
               badPostureDuration: ergonomics.badPostureDuration,
-              tabSwitches: tabFocus.tabSwitchCount,
             },
           }),
         });
@@ -113,8 +108,6 @@ export default function Dashboard() {
             data.text ||
             (type === 'POSTURE_COLLAPSE'
               ? 'Critical posture collapse detected. Re-align your spine, level your shoulders, and draw your chin back.'
-              : type === 'TAB_SWITCH'
-              ? 'Security violation: Unsanctioned browser navigation detected. Continuous eye-gaze tracking is engaged.'
               : 'Proctor warning: Suspicious gaze deflection detected away from center screen. Refocus your eyes on the exam immediately.');
 
           setActiveVoicePrompt(text);
@@ -136,7 +129,7 @@ export default function Dashboard() {
         setIsSpeaking(false);
       }
     },
-    [audioMuted, postureMetrics, gazeMetrics, antiCheating, ergonomics, tabFocus.tabSwitchCount]
+    [audioMuted, postureMetrics, gazeMetrics, antiCheating, ergonomics]
   );
 
   // Trigger voice coaching automatically on 30s Posture Collapse
@@ -156,15 +149,6 @@ export default function Dashboard() {
       triggerVoiceAlert('PROCTOR_VIOLATION');
     }
   }, [antiCheating.isViolating, triggerVoiceAlert]);
-
-  // Trigger voice coaching on Tab Switch / Unsanctioned Navigation
-  const lastTabSwitchAlertRef = useRef<number>(0);
-  useEffect(() => {
-    if (tabFocus.lastViolationEvent && Date.now() - lastTabSwitchAlertRef.current > 6000) {
-      lastTabSwitchAlertRef.current = Date.now();
-      triggerVoiceAlert('TAB_SWITCH');
-    }
-  }, [tabFocus.lastViolationEvent, triggerVoiceAlert]);
 
   // Export Audit Log (CSV)
   const exportCsv = () => {
@@ -265,7 +249,7 @@ export default function Dashboard() {
         </div>
 
         {/* Engine status indicators */}
-        <div className="flex flex-wrap items-center gap-2.5 mt-2 sm:mt-0 text-xs">
+        <div className="flex items-center gap-3 mt-2 sm:mt-0 text-xs">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0d1522] border border-slate-700/60">
             <span
               className={`w-2 h-2 rounded-full ${
@@ -274,39 +258,6 @@ export default function Dashboard() {
             />
             <span className="text-slate-300 font-semibold">
               {cameraActive ? `CAM ACTIVE (${fps} FPS)` : 'CAM STANDBY'}
-            </span>
-          </div>
-
-          {/* Browser Tab & Background Worker Sentry Pill */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded border font-semibold transition ${
-              !tabFocus.isTabVisible || !tabFocus.isWindowFocused
-                ? 'bg-rose-950/80 border-rose-500 text-rose-300 animate-pulse shadow-[0_0_12px_rgba(255,34,68,0.4)]'
-                : tabFocus.tabSwitchCount > 0
-                ? 'bg-amber-950/70 border-amber-500/60 text-amber-300'
-                : 'bg-[#0d1522] border-slate-700/60 text-slate-300'
-            }`}
-            title={
-              !tabFocus.isTabVisible
-                ? 'Background Worker Ticker Active (~20 FPS) - Candidate is away from tab'
-                : `Browser Tab Focus Status: ${tabFocus.tabSwitchCount} total navigation switches recorded`
-            }
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                !tabFocus.isTabVisible
-                  ? 'bg-rose-500 animate-ping'
-                  : tabFocus.tabSwitchCount > 0
-                  ? 'bg-amber-400'
-                  : 'bg-emerald-400'
-              }`}
-            />
-            <span>
-              {!tabFocus.isTabVisible
-                ? 'OFF-SCREEN SENTRY (BG TICKING)'
-                : tabFocus.tabSwitchCount > 0
-                ? `TAB MONITORED (${tabFocus.tabSwitchCount} SW)`
-                : 'TAB SECURE'}
             </span>
           </div>
 
@@ -1011,45 +962,6 @@ export default function Dashboard() {
                 {postureMetrics.slouching ? 'DETECTED // SLOUCHING' : 'NOMINAL'}
               </span>
             </div>
-
-            {/* Browser Visibility & Tab Switch Sentry Readout */}
-            <div className="p-3 bg-[#080c14] rounded-lg border border-slate-800 text-xs flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="w-4 h-4 text-cyan-400" />
-                  <span className="text-slate-300 font-semibold">Tab Visibility Sentry:</span>
-                </div>
-                <span
-                  className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                    !tabFocus.isTabVisible || !tabFocus.isWindowFocused
-                      ? 'bg-rose-950 text-rose-300 border border-rose-500/60 animate-pulse'
-                      : tabFocus.tabSwitchCount > 0
-                      ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
-                      : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
-                  }`}
-                >
-                  {!tabFocus.isTabVisible
-                    ? 'OFF-SCREEN (20 FPS BG SENTRY)'
-                    : tabFocus.tabSwitchCount > 0
-                    ? `${tabFocus.tabSwitchCount} VIOLATION${tabFocus.tabSwitchCount > 1 ? 'S' : ''}`
-                    : 'SECURE // IN-FOCUS'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-                <span>Background Worker Engine:</span>
-                <span className="text-emerald-400 font-mono">
-                  {tabFocus.isBackgroundRunning ? 'ACTIVE (50ms interval)' : 'STANDBY READY'}
-                </span>
-              </div>
-              {tabFocus.lastAwayDurationSec > 0 && (
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Last Tab Switch Duration:</span>
-                  <span className="text-rose-400 font-mono font-bold">
-                    {tabFocus.lastAwayDurationSec.toFixed(1)}s
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -1146,72 +1058,6 @@ export default function Dashboard() {
               className="w-full py-3 px-6 rounded-xl font-black text-sm tracking-wider uppercase bg-gradient-to-r from-red-600 to-rose-600 text-white hover:brightness-125 active:scale-95 transition shadow-[0_0_30px_rgba(255,0,0,0.7)]"
             >
               Dismiss & Refocus On Screen
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL 3: Re-Entry Warning Modal: Unsanctioned Tab Switch (Mandatory Recalibration) ── */}
-      {tabFocus.reentryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl bg-[#0d0305] border-4 border-rose-600 rounded-2xl p-6 md:p-8 shadow-[0_0_80px_rgba(255,0,50,0.85)] flex flex-col items-center text-center">
-            {/* Top Security Banner Icon */}
-            <div className="w-20 h-20 rounded-full bg-rose-950/90 border-2 border-rose-500 flex items-center justify-center mb-4 animate-pulse shadow-[0_0_35px_rgba(255,34,68,0.7)]">
-              <Lock className="w-10 h-10 text-rose-400" />
-            </div>
-
-            <div className="px-3 py-1 rounded bg-rose-950 border border-rose-500/80 text-rose-300 text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>UNSANCTIONED NAVIGATION // PROCTORING LOCK ENGAGED</span>
-            </div>
-
-            <h2 className="text-2xl md:text-3xl font-black text-rose-400 tracking-wider mb-2">
-              TAB SWITCH DETECTED
-            </h2>
-
-            <p className="text-xs md:text-sm text-slate-200 mb-4 leading-relaxed">
-              The exam sentry detected an unsanctioned browser tab switch or window blur. Continuous background eye-gaze tracking was maintained off-screen at 20 FPS and logged into your tamper-evident audit trail.
-            </p>
-
-            {/* Incident Metrics Grid */}
-            <div className="grid grid-cols-3 gap-2 w-full mb-4 text-left">
-              <div className="bg-[#18060a] border border-rose-500/40 rounded-lg p-2.5">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">Time Away</div>
-                <div className="text-lg font-black text-rose-400">
-                  {tabFocus.lastAwayDurationSec.toFixed(1)}s
-                </div>
-              </div>
-              <div className="bg-[#18060a] border border-rose-500/40 rounded-lg p-2.5">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">Total Switches</div>
-                <div className="text-lg font-black text-rose-400">
-                  #{tabFocus.tabSwitchCount}
-                </div>
-              </div>
-              <div className="bg-[#18060a] border border-rose-500/40 rounded-lg p-2.5">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">Off-Screen Gaze</div>
-                <div className="text-xs font-bold text-emerald-400 mt-1">
-                  CONTINUOUS ACTIVE
-                </div>
-              </div>
-            </div>
-
-            {/* Mandatory Calibration Requirement Notice */}
-            <div className="w-full bg-[#18080f] border border-amber-500/60 rounded-xl p-3.5 text-left mb-6">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-400 mb-1">
-                <RotateCcw className="w-4 h-4 text-amber-400 animate-spin-slow" />
-                <span>MANDATORY RE-ENTRY GAZE RECALIBRATION</span>
-              </div>
-              <p className="text-xs text-amber-200/90 leading-relaxed">
-                Before resuming your exam session, you must sit upright, center your face and look directly into the camera lens. Clicking the button below will reset your neutral gaze vector, record baseline re-calibration, and dismiss this security lock.
-              </p>
-            </div>
-
-            <button
-              onClick={() => tabFocus.dismissReentryAndCalibrate(calibrate)}
-              className="w-full py-3.5 px-6 rounded-xl font-black text-sm tracking-wider uppercase bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 text-white hover:brightness-125 active:scale-95 transition shadow-[0_0_35px_rgba(255,34,68,0.7)] flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Crosshair className="w-4 h-4" />
-              <span>Center Eyes & Re-Calibrate Gaze to Resume</span>
             </button>
           </div>
         </div>

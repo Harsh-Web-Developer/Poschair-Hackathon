@@ -36,48 +36,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${pressStart.variable} ${vt323.variable} ${spaceGrotesk.variable}`}>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                if (typeof window !== 'undefined') {
-                  var origErr = console.error;
-                  var origWarn = console.warn;
-                  console.error = function() {
-                    var msg = arguments[0];
-                    if (typeof msg === 'string' && (
-                      msg.indexOf('INFO:') === 0 ||
-                      msg.indexOf('TensorFlow Lite') !== -1 ||
-                      msg.indexOf('XNNPACK') !== -1
-                    )) {
-                      if (console.info) {
-                        console.info.apply(console, arguments);
-                      }
-                      return;
-                    }
-                    origErr.apply(console, arguments);
-                  };
-                  console.warn = function() {
-                    var msg = arguments[0];
-                    if (typeof msg === 'string' && (
-                      msg.indexOf('INFO:') === 0 ||
-                      msg.indexOf('TensorFlow Lite') !== -1 ||
-                      msg.indexOf('XNNPACK') !== -1
-                    )) {
-                      if (console.info) {
-                        console.info.apply(console, arguments);
-                      }
-                      return;
-                    }
-                    origWarn.apply(console, arguments);
-                  };
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

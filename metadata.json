@@ -1,0 +1,6 @@
+{
+  "name": "AI Exam Proctoring & Ergonomic Posture Sentry",
+  "description": "Cyberpunk Neural HUD for real-time exam proctoring gaze detection and 30-second ergonomic posture collapse alerts with Gemini 3.5 Flash & ElevenLabs voice coaching.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

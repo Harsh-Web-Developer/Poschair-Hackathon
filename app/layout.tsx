@@ -24,7 +24,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'AI Exam Proctoring & Ergonomic Posture Sentry',
+  title: 'PosChair - AI Exam Proctoring & Ergonomic Posture Sentry',
   description: 'Cyberpunk Neural HUD for real-time exam proctoring gaze detection and 30-second ergonomic posture collapse alerts with Gemini 3.5 Flash & ElevenLabs voice coaching.',
   keywords: ['exam proctoring', 'gaze tracking', 'anti-cheating', 'ergonomic posture', 'AI', 'webcam', 'MediaPipe', 'Gemini Flash', 'ElevenLabs', 'Cyberpunk HUD'],
   icons: {

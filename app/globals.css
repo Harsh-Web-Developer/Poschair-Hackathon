@@ -1237,3 +1237,49 @@ body::before {
     font-size: 11px;
   }
 }
+
+/* ── Mobile Adaptive & Touch Utilities ─────────────────────────────── */
+.touch-btn-44 {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.horizontal-card-scroll {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.horizontal-card-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.horizontal-card-scroll::-webkit-scrollbar-track {
+  background: rgba(6, 9, 14, 0.6);
+}
+
+.horizontal-card-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.4);
+  border-radius: 4px;
+}
+
+.horizontal-card-scroll > * {
+  scroll-snap-align: start;
+}
+
+/* Mobile Sticky Video Viewport */
+@media (max-width: 1023px) {
+  .sticky-mobile-viewport {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: #06090e;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  }
+}
+

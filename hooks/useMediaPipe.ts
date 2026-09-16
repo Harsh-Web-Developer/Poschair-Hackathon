@@ -8,12 +8,8 @@ import {
   CalibratedPostureResult,
   PoseLandmark,
 } from '../lib/postureScoring';
-import {
-  calculatePupilGaze,
-  GazeEvaluationResult,
-  GazeDirectionType,
-  LandmarkPoint,
-} from '../lib/gazeDetection';
+import { calculatePupilGaze, GazeEvaluationResult, GazeDirectionType, LandmarkPoint } from '../lib/gazeDetection';
+import { useIsMobile } from './useIsMobile';
 
 export type GazeDirection = GazeDirectionType | 'AWAY' | 'LOOKING_LEFT' | 'LOOKING_RIGHT' | 'LOOKING_DOWN';
 export type PostureStatus = 'OPTIMAL' | 'COMPROMISED' | 'CRITICAL';
@@ -84,6 +80,9 @@ export interface ErgonomicsMetrics {
 }
 
 export function useMediaPipe() {
+  const { isMobile } = useIsMobile();
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const lastProcessTimeRef = useRef<number>(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -368,6 +367,16 @@ export function useMediaPipe() {
     }
 
     const now = performance.now();
+
+    // Mobile Hardware Adaptation: Throttle processing rate to 15-20 FPS (~55ms interval)
+    // on mobile hardware to prevent thermal throttling, overheating, and battery drain.
+    const minFrameIntervalMs = isMobile ? 55 : 0;
+    if (minFrameIntervalMs > 0 && now - lastProcessTimeRef.current < minFrameIntervalMs) {
+      animFrameIdRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+    lastProcessTimeRef.current = now;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       animFrameIdRef.current = requestAnimationFrame(processFrame);
@@ -807,11 +816,16 @@ export function useMediaPipe() {
     try {
       await initMediaPipe();
 
+      const isPortrait =
+        typeof window !== 'undefined' &&
+        window.innerHeight > window.innerWidth &&
+        window.innerWidth < 768;
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user',
+          width: { ideal: isPortrait ? 720 : 1280 },
+          height: { ideal: isPortrait ? 1280 : 720 },
+          facingMode: facingMode,
         },
         audio: false,
       });
@@ -832,7 +846,37 @@ export function useMediaPipe() {
         0
       );
     }
-  }, [initMediaPipe, processFrame, logAuditEvent]);
+  }, [initMediaPipe, processFrame, logAuditEvent, facingMode]);
+
+  // Flip between front and rear cameras (touch/mobile devices)
+  const flipCamera = useCallback(async () => {
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    if (cameraActive && videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const isPortrait =
+          typeof window !== 'undefined' &&
+          window.innerHeight > window.innerWidth &&
+          window.innerWidth < 768;
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: isPortrait ? 720 : 1280 },
+            height: { ideal: isPortrait ? 1280 : 720 },
+            facingMode: nextMode,
+          },
+          audio: false,
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+          await videoRef.current.play();
+        }
+      } catch (err: any) {
+        console.error('Failed to switch camera facing mode:', err);
+      }
+    }
+  }, [facingMode, cameraActive]);
 
   // Stop Webcam
   const stopCamera = useCallback(() => {
@@ -953,5 +997,9 @@ export function useMediaPipe() {
     dismissProctorAlert,
     clearAuditLog,
     logAuditEvent,
+    isMobile,
+    facingMode,
+    flipCamera,
+    isMirrored: facingMode === 'user',
   };
 }
